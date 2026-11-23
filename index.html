@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Амели-пати</title>
+<style>
+:root{--bg:#fff0f7;--card:#ffffff;--ink:#2b1b2e;--muted:#7a6580;--accent:#d63384;--line:#f3c9df;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root{--bg:#1c1020;--card:#2a1830;--ink:#fbeefa;--muted:#b79cc0;--accent:#ff6fb5;--line:#4a2a55;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.45}
+main{max-width:560px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:28px;margin:8px 0 4px;text-align:center}
+.sub{text-align:center;color:var(--muted);margin:0 0 20px}
+.card{background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:14px 16px;margin-bottom:14px}
+h2{font-size:18px;margin:0 0 8px}
+ol.rules{margin:0;padding-left:20px}
+ol.rules li{margin:4px 0}
+.mine{border:2px solid var(--accent)}
+.topic{display:block;width:100%;text-align:left;background:var(--card);color:var(--ink);border:1.5px solid var(--line);border-radius:16px;padding:12px 14px;margin-bottom:10px;font:inherit;cursor:pointer}
+.topic:active{transform:scale(.98)}
+.topic b{display:block;font-size:16px}
+.topic span{color:var(--muted);font-size:14px}
+.count{color:var(--muted);font-size:14px;margin:0 0 10px}
+.btn{border:0;border-radius:12px;padding:10px 16px;font:inherit;font-weight:600;cursor:pointer;background:var(--accent);color:#fff}
+.btn.ghost{background:transparent;color:var(--muted);border:1.5px solid var(--line)}
+.row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+#modal{position:fixed;inset:0;background:rgba(20,5,25,.6);display:none;align-items:center;justify-content:center;padding:20px;z-index:20}
+#modal.on{display:flex}
+#modal .card{max-width:400px;width:100%;margin:0}
+#msg{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;display:none;z-index:30;max-width:90%}
+</style>
+</head>
+<body>
+<main>
+  <h1>Амели-пати</h1>
+  <p class="sub">Вечеринка презентаций. Тема остаётся секретом до вечера</p>
+
+  <div class="card">
+    <h2>Правила</h2>
+    <ol class="rules">
+      <li>Мемы везде, минимум один на слайд</li>
+      <li>Times New Roman 14 запрещён</li>
+      <li>Мат, сленг и кринжовые картинки приветствуются, чем больше, тем лучше</li>
+      <li>Слайдов много, не стесняемся</li>
+      <li>Тема на выбор</li>
+      <li>Рассказываем с выражением, без чтения со слайда</li>
+      <li>Тема держится в секрете до вечера</li>
+    </ol>
+  </div>
+
+  <div id="mine"></div>
+
+  <div id="pick">
+    <h2 id="ph">Выбери до двух тем</h2>
+    <p class="count" id="count">Загружаем темы…</p>
+    <div id="list"></div>
+  </div>
+</main>
+
+<div id="modal"><div class="card">
+  <h2 id="mt"></h2>
+  <p id="md" class="sub" style="text-align:left"></p>
+  <p>Забираешь эту тему? Остальные её уже не увидят.</p>
+  <div class="row"><button class="btn" id="yes">Беру</button><button class="btn ghost" id="no">Назад</button></div>
+</div></div>
+<div id="msg"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { getFirestore, collection, doc, onSnapshot, runTransaction, deleteDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyByl0Bb_-EPwNfzh4ODm4kXkSZFydvJDy8",
+  authDomain: "ameli-powerpoint-party-78758.firebaseapp.com",
+  projectId: "ameli-powerpoint-party-78758",
+  storageBucket: "ameli-powerpoint-party-78758.firebasestorage.app",
+  messagingSenderId: "202456628236",
+  appId: "1:202456628236:web:550cc843244e6c1ff7c229"
+};
+const db = getFirestore(initializeApp(firebaseConfig));
+
+const TOPICS=[
+{id:"t1",t:"Айсберг мемов Амели",d:"От «мы же всегда в 3 дружили» до тайн, о которых знаем только мы"},
+{id:"t2",t:"Хронология нашей дружбы как документалка",d:"Нарратор с голосом Дэвида Аттенборо, вымирающий вид в естественной среде"},
+{id:"t3",t:"Мой Spotify Wrapped: каждая песня как диагноз",d:"Психологи разбирают плейлист, плейлист разбирает психологов"},
+{id:"t4",t:"Оскар для подруг",d:"Номинации, которых нет нигде. Речи победительниц обязательны"},
+{id:"t5",t:"Мои бывшие как стартапы",d:"Бизнес-модель, причина краха, уроки для инвесторов"},
+{id:"t6",t:"Если бы наша группа была реалити-шоу",d:"Кастинг, сюжет, скандалы, интриги, расследования"},
+{id:"t7",t:"Психология мемов",d:"Почему мы ржём над болью и что говорит о нас чёрный юмор"},
+{id:"t8",t:"История лжи",d:"Как людей обманывали с помощью науки: от эксперимента Стэнфорда до мифа про 10% мозга"},
+{id:"t9",t:"Токсичные тренды соцсетей",d:"От clean girl до hot girl walk: маркетинг под видом психологии"},
+{id:"t10",t:"Рейтинг психотеорий «это про меня»",d:"Чем теория страшнее, тем выше место в топе"},
+{id:"t11",t:"Суд над Амели: за что каждую из нас можно посадить",d:"Обвинения, доказательства, свидетели, статьи УК и сроки. Кто получит пожизненное?"},
+{id:"t12",t:"Кто из нас первым попадёт в секту и почему",d:"Чем заманят, какую роль займёт каждая и кто в итоге создаст собственную секту"},
+{id:"t13",t:"Если бы Амели были криминальной группировкой",d:"Роли в ОПГ, специализация, слабые места и кто сдаст всех на первом допросе"},
+{id:"t14",t:"Как каждая из нас испортит себе жизнь за 48 часов",d:"Индивидуальный сценарий катастрофы с учётом характера, привычек и прошлых достижений"},
+{id:"t15",t:"Как каждая из нас стала бы злодейкой в фильме",d:"Предыстория, мотивация, точка невозврата, фирменная фраза и финал"},
+{id:"t16",t:"Если бы наши переписки утекли: кто первой уедет из страны",d:"Репутационные риски, компромат и последствия международного масштаба"},
+{id:"t17",t:"Кто выживет в постапокалипсисе, а кого съедят первой",d:"Стратегии выживания, ресурсы, полезные навыки и причины гибели каждой"},
+{id:"t18",t:"Как нас разводят мошенники на деньги и эмоции",d:"Социальная инженерия, страх, искусственная срочность и реальные схемы"},
+{id:"t19",t:"Психология серийных убийц",d:"Где заканчивается личность и начинается патология: психопатия, факторы риска и мифы из фильмов"},
+{id:"t20",t:"Как нас можно завербовать или обмануть",d:"Конформизм, подчинение авторитету, эксперименты Милгрэма и Аша, внушаемость"},
+{id:"t21",t:"Амели как социальный эксперимент",d:"Групповая динамика, роли в коллективе, социальная идентичность и внутренние мемы"},
+{id:"t22",t:"Мы выбираем или просто оправдываем решения мозга",d:"Свобода воли, бессознательные процессы и когнитивные искажения"},
+{id:"t23",t:"Почему хорошие люди совершают ужасные поступки",d:"Эффект Люцифера, подчинение авторитету и ситуационные факторы"},
+{id:"t24",t:"Можно ли измерить ценность человека",d:"Статус, внешность, интеллект, деньги и почему мы вообще оцениваем людей"},
+{id:"t25",t:"Насколько мы вообще нормальные",d:"История психиатрии, культурные различия, стигматизация и границы нормы"},
+{id:"t26",t:"Тёмная триада: кто из нас психопат, нарцисс и манипулятор",d:"Макиавеллизм, нарциссизм, психопатия, шуточные тесты и вердикты"},
+{id:"t27",t:"Если бы наши личности были государствами",d:"Режим, экономика, законы, коррупция, армия и дипломатия между государствами Амели"}
+];
+const byId=Object.fromEntries(TOPICS.map(t=>[t.id,t]));
+const KEY="ameli_my_topics",MAX=2;
+let claimed=new Set(),loaded=false,pending=null,busy=false,mine=[];
+try{mine=JSON.parse(localStorage.getItem(KEY)||"[]").filter(id=>byId[id])}catch(e){mine=[]}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(mine))}catch(e){}};
+const $=id=>document.getElementById(id);
+function toast(s){const m=$("msg");m.textContent=s;m.style.display="block";clearTimeout(toast.t);toast.t=setTimeout(()=>m.style.display="none",3000)}
+
+function render(){
+  const box=$("mine"),list=$("list");
+  box.innerHTML="";
+  if(mine.length){
+    const c=document.createElement("div");c.className="card mine";
+    c.innerHTML="<h2>"+(mine.length>1?"Твои темы":"Твоя тема")+"</h2>";
+    mine.forEach(id=>{
+      const t=byId[id];
+      const w=document.createElement("div");w.style.margin="10px 0";
+      w.innerHTML="<b>"+t.t+"</b><p class=\"sub\" style=\"text-align:left;margin:4px 0 8px\">"+t.d+"</p>";
+      const b=document.createElement("button");b.className="btn ghost";b.textContent="Передумала";b.onclick=()=>release(id);
+      w.appendChild(b);c.appendChild(w);
+    });
+    box.appendChild(c);
+  }
+  const left=MAX-mine.length;
+  $("pick").style.display=left>0?"":"none";
+  $("ph").textContent=mine.length?"Выбери вторую тему (по желанию)":"Выбери до двух тем";
+  const free=TOPICS.filter(t=>!claimed.has(t.id)&&!mine.includes(t.id));
+  $("count").textContent=loaded?(free.length?"Осталось тем: "+free.length:"Все темы разобрали"):"Загружаем темы…";
+  list.innerHTML="";
+  if(!loaded)return;
+  free.forEach(t=>{
+    const b=document.createElement("button");b.className="topic";
+    b.innerHTML="<b>"+t.t+"</b><span>"+t.d+"</span>";
+    b.onclick=()=>{pending=t.id;$("mt").textContent=t.t;$("md").textContent=t.d;$("modal").classList.add("on")};
+    list.appendChild(b);
+  });
+}
+$("no").onclick=()=>{pending=null;$("modal").classList.remove("on")};
+$("yes").onclick=async()=>{
+  const id=pending;$("modal").classList.remove("on");pending=null;
+  if(!id||busy||mine.length>=MAX)return;busy=true;
+  try{
+    const ref=doc(db,"claims",id);
+    await runTransaction(db,async tx=>{
+      const s=await tx.get(ref);
+      if(s.exists())throw new Error("taken");
+      tx.set(ref,{taken:true});
+    });
+    mine.push(id);save();render();
+  }catch(e){
+    toast(e.message==="taken"?"Эту тему только что забрали, выбери другую":"Не получилось, попробуй ещё раз");
+  }finally{busy=false}
+};
+async function release(id){
+  if(busy)return;busy=true;
+  try{
+    await deleteDoc(doc(db,"claims",id));
+    mine=mine.filter(x=>x!==id);save();render();
+  }catch(e){toast("Не получилось, попробуй ещё раз")}
+  finally{busy=false}
+}
+
+render();
+setTimeout(()=>{if(!loaded)$("count").textContent="Не получилось загрузить, обнови страницу."},10000);
+onSnapshot(collection(db,"claims"),s=>{
+  claimed=new Set(s.docs.map(d=>d.id));
+  loaded=true;render();
+},()=>{});
+</script>
+</body>
+</html>
